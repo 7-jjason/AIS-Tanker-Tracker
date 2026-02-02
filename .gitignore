@@ -1,0 +1,30 @@
+# --- User Specific Ignores ---
+
+# Ignore the 'rm' folder and all its contents
+rm/
+
+# Ignore sensitive API keys (AIS)
+ais_api_key.R
+
+# --- System & R Files ---
+
+# History and workspace files
+.Rhistory
+.RData
+.Ruserdata
+
+# macOS system files
+.DS_Store
+
+# --- Standard R Project Ignores ---
+
+# RStudio files
+.Rproj.user/
+
+# Package development files
+/.build/
+/.libPaths/
+
+# Folders for generated data/logs (Optional but recommended)
+*.log
+.Rapp.history
