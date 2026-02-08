@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-setwd("/Users/josephjason/Documents/Forecasting/R/projects/ais_pls")
+# setwd("/Users/josephjason/Documents/Forecasting/R/projects/ais_pls")
 # #############################################################################
 # # Smart Launcher - WiFi Check + Auto-Restart                               #
 # #############################################################################
@@ -32,7 +32,7 @@ is_wifi_connected <- function() {
   result <- tryCatch({
     # Ping Google DNS (8.8.8.8) with 1 packet, 2-second timeout
     ping_result <- system2("ping", 
-                           args = c("-c", "1", "-W", "2", "8.8.8.8"), 
+                           args = c("-c", "1", "-W", "2000", "8.8.8.8"), 
                            stdout = FALSE, 
                            stderr = FALSE)
     # Exit code 0 = success
@@ -54,12 +54,7 @@ are_processes_running <- function() {
       count <- as.numeric(trimws(ps_output))
       # All 3 processes should be running
       return(count >= 3)
-    } else {
-      # Windows: check for Rscript processes
-      tasklist <- system("tasklist | findstr Rscript", intern = TRUE)
-      # Rough check: should have multiple Rscript instances
-      return(length(tasklist) >= 3)
-    }
+    } 
   }, error = function(e) {
     cat(sprintf("[ERROR] Could not check process status: %s\n", e$message))
     return(FALSE)
@@ -162,7 +157,6 @@ repeat {
     }, error = function(e) {
       cat("[STOP] Could not remove STOP_AIS.txt\n")
     })
-    
     break
   }
   

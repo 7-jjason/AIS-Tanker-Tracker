@@ -969,13 +969,13 @@ repeat {
         # Extract time stamps for both file types
         timestamps <- regmatches(all_files, regexpr("\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}", all_files))
         timestamps <- as.POSIXct(timestamps, format = "%Y-%m-%d_%H-%M-%S")
-        # Create a logical vector to filter by (remove files > 60 hours old)
+        # Create a logical vector to filter by (remove files > 24 hours old)
         delete_ls <- timestamps < (Sys.time() - 60 * 60 * 24)
         # Filter by logical vector
         if (any(delete_ls, na.rm = TRUE)) {
-          # Move to archive
+          # Create archive
           if (!dir.exists("data/archived")) dir.create("data/archived", recursive = TRUE)
-          
+          # Move to archive
           archived_count <- 0
           for (i in which(delete_ls)) {
             old_path <- all_files[i]
