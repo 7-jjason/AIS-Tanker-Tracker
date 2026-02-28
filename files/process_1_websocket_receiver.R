@@ -152,6 +152,7 @@ cat("---------------------------------------------------------------------------
 retry_delay <- 1 # 1s backoff to start
 max_delay <- 60  # 60s cap for backoff
 ws <- NULL       
+last_message_time <- Sys.time()
 
 # Main event loop
 tryCatch({
@@ -180,7 +181,7 @@ tryCatch({
       wait_counter <- 0
       while (ws$readyState() == 0 && wait_counter < 50) {
         later::run_now()
-        Sys.sleep(0.1)
+        Sys.sleep(0.5)
         wait_counter <- wait_counter + 1
       }
       
@@ -193,7 +194,17 @@ tryCatch({
             retry_delay))
         Sys.sleep(retry_delay)
         retry_delay <- min(retry_delay * 2, max_delay) # Doubles each time
-        next # Skip to next iteration
+        next 
+      }
+      
+      if (exists("last_message_time") && 
+          difftime(Sys.time(), last_message_time, units = "secs") > 30) {
+        cat("[TIMEOUT] No data in 30s, forcing reconnect...\n")
+        try(ws$close(), silent = TRUE)
+        ws <- NULL
+        Sys.sleep(retry_delay)
+        retry_delay <- min(retry_delay * 2, max_delay)
+        next
       }
     }
       # Process websocket events

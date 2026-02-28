@@ -4,6 +4,8 @@ cd ~/Documents/Forecasting/R/projects/ais_pls
 Start in background (logs to file):
 nohup Rscript files/background_launcher.R > logs/launcher.log 2>&1 &
 
+nohup Rscript ~/Documents/Forecasting/R/projects/ais_pls/files/background_launcher.R > ~/Documents/Forecasting/R/projects/ais_pls/logs/launcher.log 2>&1 &
+
 Start in foreground (see output directly):
 Rscript files/background_launcher.R
 
@@ -31,3 +33,10 @@ rm logs/processes/*.log
 
 Show entire launcher log:
 cat logs/launcher.log
+
+
+See R processes: 
+pgrep -a R
+
+# For scheduler
+nohup Rscript /Users/josephjason/Documents/Forecasting/R/projects/schedule.R > /Users/josephjason/Documents/Forecasting/R/projects/logs/console.log 2>&1 &

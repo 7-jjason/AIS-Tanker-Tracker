@@ -1,12 +1,13 @@
 # --- User Specific Ignores ---
 
-# Ignore the 'rm' folder and all its contents
-rm/
-
 # Ignore filtered RDS data
+data/regression_data.csv
+data/raw_hex/raw_hex*
+data/port_list.rds
+data/port_list_2.rds
 data/filtered/filtered_*
 data/archived/filtered_*
-ais.zip
+files/db_password.R
 
 # Ignore sensitive API keys (AIS)
 ais_api_key.R

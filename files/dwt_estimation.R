@@ -1,3 +1,5 @@
+# Estimate dwt of tankers from sample data using equasis
+
 file_list <- list.files("data/processed", 
                         all.files = TRUE,
                         full.names = TRUE)

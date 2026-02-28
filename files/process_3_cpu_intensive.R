@@ -5,7 +5,7 @@
 # #############################################################################
 # # (0) Initialize  ----------------------------------------------------------
 # #############################################################################
-
+setwd("/Users/josephjason/Documents/Forecasting/R/projects/AIS Tanker Tracker")
 suppressPackageStartupMessages({
   library(data.table)
   library(dplyr)
@@ -33,7 +33,7 @@ if (!dir.exists("logs")) dir.create("logs")
 processed_file_counter <- 1
 
 # Timing parameters
-cycle_interval_mins <- 24 * 60  # Minutes
+cycle_interval_mins <- 1 * 24 * 60  # Minutes
 
 # Statistics
 stats_count <- list(
@@ -878,7 +878,7 @@ repeat {
         standardize_to_breadth(dt)  # Standardize each file individually
       }, error = function(e) {
         write(sprintf("%s [LOAD ERROR] %s: %s\n", Sys.time(), basename(f), e$message),
-              file = "logs/error_log.txt", append = TRUE)
+              file = "logs/error_log.log", append = TRUE)
         return(data.table())
       })
     }))
@@ -890,7 +890,7 @@ repeat {
         standardize_to_breadth(dt)  # Standardize each file individually
       }, error = function(e) {
         write(sprintf("%s [LOAD ERROR] %s: %s\n", Sys.time(), basename(f), e$message),
-              file = "logs/error_log.txt", append = TRUE)
+              file = "logs/error_log.log", append = TRUE)
         return(data.table())
       })
     }))
@@ -935,7 +935,9 @@ repeat {
         if (file.exists(master_file)) {
           existing_data <- readRDS(master_file)
           combined_data <- rbindlist(list(existing_data, new_data), fill = TRUE)
-          combined_data <- unique(combined_data)
+          combined_data[, time_block := round_date(start_time, "4 hours")]
+          combined_data <- unique(combined_data, by = c("mmsi", "time_block"))
+          combined_data[, time_block := NULL]
           setorder(combined_data, mmsi, start_time)
           saveRDS(combined_data, file = master_file)
           cat(sprintf("[AGGREGATION] Appended %d events (total: %d)\n", 
@@ -970,7 +972,7 @@ repeat {
         timestamps <- regmatches(all_files, regexpr("\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}", all_files))
         timestamps <- as.POSIXct(timestamps, format = "%Y-%m-%d_%H-%M-%S")
         # Create a logical vector to filter by (remove files > 24 hours old)
-        delete_ls <- timestamps < (Sys.time() - 60 * 60 * 24)
+        delete_ls <- timestamps < (Sys.time() - 60 * 60 * 12)
         # Filter by logical vector
         if (any(delete_ls, na.rm = TRUE)) {
           # Create archive
@@ -992,7 +994,7 @@ repeat {
       }, error = function(e) {
         cat(sprintf("[ERROR] Pipeline failed: %s\n", e$message))
         write(sprintf("%s [PIPELINE ERROR] %s\n", Sys.time(), e$message),
-              file = "logs/error_log.txt", append = TRUE)
+              file = "logs/error_log.log", append = TRUE)
       })
     }
     

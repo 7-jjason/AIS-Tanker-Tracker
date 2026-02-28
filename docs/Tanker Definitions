@@ -1,0 +1,31 @@
+Tanker Definitions: 
+
+https://www.enercongroup.com/definitionstanker.html
+
+Classification of Petroleum: Classes "A-C" of petroleum are considered 
+flammable and have a flash point of 80° F or below. Examples of these classes
+range from very light napthas (Class A) to most crude oils (Class C). Class D 
+cargoes such as kerosene and heavy crudes are considered combustible and have 
+a flash point above 80° F but below 150° F. Class E cargoes are the heavier 
+fuel oils and lubricating oils and have a flash point above 150° F.
+
+
+https://gpsd.gitlab.io/gpsd/AIVDM.html#_type_8_binary_broadcast_message
+
+Type 1, 2 and 3 Position Report Class A - Navigation Status:
+0 - Under way using engine
+1 - At anchor
+2 - Not under command
+3 - Restricted manoeuverability
+4 - Constrained by her draught
+5 - Moored
+6 - Aground
+7 - Engaged in Fishing
+8 - Under way sailing
+9 - Reserved for future amendment of Navigational Status for HSC
+10 - Reserved for future amendment of Navigational Status for WIG
+11 - Power-driven vessel towing astern (regional use)
+12 - Power-driven vessel pushing ahead or towing alongside (regional use).
+13 - Reserved for future use
+14 - AIS-SART is active
+15 - Ubdefined (default)

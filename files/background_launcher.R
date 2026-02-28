@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# setwd("/Users/josephjason/Documents/Forecasting/R/projects/ais_pls")
+# setwd("/Users/josephjason/Documents/Forecasting/R/projects/AIS Tanker Tracker")
 # #############################################################################
 # # Smart Launcher - WiFi Check + Auto-Restart                               #
 # #############################################################################
@@ -12,7 +12,8 @@
 process_scripts <- c(
   "files/process_1_websocket_receiver.R",
   "files/process_2_parser_filter.R", 
-  "files/process_3_cpu_intensive.R"
+  "files/process_3_cpu_intensive.R",
+  "files/process_4_archive_to_postgreSQL.R"
 )
 
 # Monitoring settings
@@ -49,11 +50,11 @@ are_processes_running <- function() {
   tryCatch({
     if (.Platform$OS.type == "unix") {
       # Count processes matching our script names
-      ps_output <- system("ps aux | grep -E 'process_[1-3]' | grep -v grep | wc -l", 
+      ps_output <- system("ps aux | grep -E 'process_[1-4]' | grep -v grep | wc -l", 
                           intern = TRUE)
       count <- as.numeric(trimws(ps_output))
-      # All 3 processes should be running
-      return(count >= 3)
+      # All 4 processes should be running
+      return(count >= 4)
     } 
   }, error = function(e) {
     cat(sprintf("[ERROR] Could not check process status: %s\n", e$message))
@@ -70,12 +71,13 @@ kill_existing_processes <- function() {
     system("pkill -f 'process_1_websocket'", ignore.stdout = TRUE, ignore.stderr = TRUE)
     system("pkill -f 'process_2_parser'", ignore.stdout = TRUE, ignore.stderr = TRUE)
     system("pkill -f 'process_3_cpu'", ignore.stdout = TRUE, ignore.stderr = TRUE)
+    system("pkill -f 'process_4_archive'", ignore.stdout = TRUE, ignore.stderr = TRUE)
     
     # Give processes time to clean up
     Sys.sleep(2)
     
     # Verify they're stopped
-    still_running <- system("ps aux | grep -E 'process_[1-3]' | grep -v grep | wc -l",
+    still_running <- system("ps aux | grep -E 'process_[1-4]' | grep -v grep | wc -l",
                             intern = TRUE)
     if (as.numeric(trimws(still_running)) == 0) {
       cat("[CLEANUP] All processes stopped\n")

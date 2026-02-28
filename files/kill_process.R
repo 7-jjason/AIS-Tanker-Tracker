@@ -1,2 +1,2 @@
-setwd("/Users/josephjason/Documents/Forecasting/R/projects/ais_pls")
+setwd("/Users/josephjason/Documents/Forecasting/R/projects/AIS Tanker Tracker")
 cat("kill process", file = "STOP_AIS.txt")
