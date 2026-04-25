@@ -7,14 +7,23 @@ data/port_list.rds
 data/port_list_2.rds
 data/filtered/filtered_*
 data/archived/filtered_*
+data/processed/
+data/output/
 files/db_password.R
-donotinclude.R
+
 *.pdf
 process_4_archive_to_postgreSQL.R
-# Ignore sensitive API keys (AIS)
-ais_api_key.R
 
-# --- System & R Files ---
+ais_api_key.R
+db_password.R
+donotinclude.R
+port_list.R
+Maritime-Tanker-Tracker-Technical-Summary.html
+Maritime Tanker Tracker Technical Summary.Rmd
+
+README.html
+
+docs/
 
 # History and workspace files
 .Rhistory
