@@ -14,7 +14,7 @@ Ingests live global AIS data, isolates tanker vessels, cleans the stream, and de
 | **P2 – Parser** | Pre-filters at hex level (no full deserialisation), parses tanker messages, deduplicates, writes RDS files. |
 | **P3 – Analysis** | Cleaning → draught-change detection -> GMM berthing confirmation -> payload estimation (24h cycle). |
 | **P4 – Storage** | Writes P2 output to MySQL for persistence. |
-| **Background Launcher** | Runs each process, deals with WiFi connectivity, emergency shutdowns, and hung processes (not included). | 
+| **Background Launcher** | Runs each process, deals with WiFi connectivity, emergency shutdowns, and hung processes. | 
 
 #### Methods
 
