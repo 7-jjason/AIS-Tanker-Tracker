@@ -1,6 +1,5 @@
-# --- User Specific Ignores ---
 
-# Ignore filtered RDS data
+
 data/regression_data.csv
 data/raw_hex/raw_hex*
 data/port_list.rds
@@ -13,7 +12,6 @@ files/db_password.R
 dwt_estimation.R
 logs/
 
-*.pdf
 process_4_archive_to_postgreSQL.R
 
 ais_api_key.R
@@ -28,22 +26,22 @@ README.html
 
 docs1/
 
-# History and workspace files
+
 .Rhistory
 .RData
 .Ruserdata
 
 
-# macOS system files
+
 .DS_Store
 
 
-# RStudio files
+
 .Rproj.user/
 
-# Package development files
+
 /.build/
 /.libPaths/
 
-# Folders for generated data/logs
+
 .Rapp.history
