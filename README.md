@@ -105,3 +105,9 @@ U.S. Energy Information Administration. (2014). Tanker sizes and classes. https:
 - MARPOL Training Institute. *MARPOL 73/78, Annex I, Regulation 18: Segregated ballast tanks*. https://www.marpoltraininginstitute.com/MMSKOREAN/MARPOL/Annex_I/r18.htm.
 - Port Economics, Management and Policy. *Tanker size categories*. https://porteconomicsmanagement.org/pemp/contents/part5/ports-and-energy/tanker-size/.
 - U.S. Energy Information Administration. (2014). *Tanker sizes and classes*. https://www.eia.gov/todayinenergy/detail.php?id=17991.
+
+#### Note
+
+- This project is a work in progress. All cargo estimates — including payload mass, draught changes, and barrel conversions — are approximations derived from AIS data and author-defined models; they are not guaranteed to be accurate and should not be treated as such.
+- Due to the concurrent, iterative nature of the four-process pipeline, processes can execute indefinitely (this is my intent). To be diligent before running this program, ensure you are familiar with your system's process management tools (Activity Monitor on macOS, Task Manager on Windows) so you can manually terminate processes if required.
+
