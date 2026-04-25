@@ -1,5 +1,5 @@
 # Estimate dwt of tankers from sample data using equasis
-
+setwd("/Users/josephjason/Documents/Forecasting/R/projects/AIS Tanker Tracker")
 file_list <- list.files("data/processed", 
                         all.files = TRUE,
                         full.names = TRUE)
@@ -199,24 +199,42 @@ data[, `:=`(dwt = c(
 
 # clean na - 1 observation
 data <- data[!is.na(dwt) & !is.na(gt)]
-write.csv(data, "data/regression_data.csv")
+# write.csv(data, "data/regression_data.csv")
 data <- read.csv("data/regression_data.csv")
 
 # Run statistics
 data[, !c("mmsi", "imo")] |>
   cor()
 
+data$factor <- data$length_m * data$beam_m * data$draught_end_m
+
 # Run a regression (did not include ship type because estimating an estimation isn't great)
-dwt_mod <- lm(log(dwt) ~ log(length_m), data = data) # 2
+dwt_mod <- lm(dwt ~ factor, data = data) 
 dwt_sum <- summary(dwt_mod)
 resid_se <- dwt_sum$sigma
 
-setDT(data)
-data[, ln_dwt_est := -5.7435 + 3.1366 * log(length_m)]
-data[, dwt_est := exp(ln_dwt_est)]
-data[, test := (dwt_est - dwt) / dwt]
-mean(data$test) 
-mean(abs(data$test)) 
+dwt_sum
 
-
+ggplot() +
+  geom_point(
+    data = data,
+    aes(
+      x = factor,
+      y = dwt
+    )
+  ) +
+  geom_line(
+    data = data |> mutate(yvar = -971.2256 + 1.0273*factor),
+    aes(
+      x = factor,
+      y = yvar
+    ),
+    colour = "blue"
+  ) +
+  labs(
+    x = "Length (m) x Breadth (m) x Draught (m)",
+    y = "Deadweight Tonnage",
+    title = ""
+  ) +
+  theme_minimal()
 

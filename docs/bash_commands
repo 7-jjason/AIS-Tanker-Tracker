@@ -1,10 +1,10 @@
 Navigate to project directory: 
-cd ~/Documents/Forecasting/R/projects/ais_pls
+cd ~`/Documents/Forecasting/R/projects/AIS Tanker Tracker`
 
 Start in background (logs to file):
 nohup Rscript files/background_launcher.R > logs/launcher.log 2>&1 &
 
-nohup Rscript ~/Documents/Forecasting/R/projects/ais_pls/files/background_launcher.R > ~/Documents/Forecasting/R/projects/ais_pls/logs/launcher.log 2>&1 &
+nohup Rscript ~/Documents/Forecasting/R/projects/AIS Tanker Tracker/files/background_launcher.R > ~/Documents/Forecasting/R/projects/AIS Tanker Tracker/logs/launcher.log 2>&1 &
 
 Start in foreground (see output directly):
 Rscript files/background_launcher.R

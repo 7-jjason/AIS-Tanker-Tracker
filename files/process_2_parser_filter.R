@@ -23,7 +23,7 @@ if (!dir.exists(filtered_dir)) dir.create(filtered_dir, recursive = TRUE)
 if (!dir.exists("logs")) dir.create("logs")
 
 # Processing parameters
-chunk_size <- 100000  # Process 25k hex lines at a time
+chunk_size <- 100000  
 
 # Hex patter definitions (fixed positions - never change in ais protocol)
 
@@ -221,7 +221,7 @@ parse_dynamic <- function(hex_string) {
   data.table(
     mmsi = meta$MMSI,
     time_utc = as.POSIXct(meta$time_utc, 
-                          # format = "%Y-%m-%d %H:%M:%0S",
+                          # format = "%Y-%m-%d %H:%M:%S",
                           tz = "UTC"),
     ship_name = trimws(meta$ShipName),
     lat = meta$latitude,
@@ -246,8 +246,11 @@ process_hex_batch <- function(hex_lines) {
   # #########################
   # # (a) Hex Pre-Filtering #
   # #########################
+  static_parse_errors <- 0
+  dynamic_parse_errors <- 0
+  is_tanker_vec <- logical(0)
   
-  # if (!is.list(hex_lines)) hex_lines <- unlist(hex_lines)
+  if (is.list(hex_lines)) hex_lines <- unlist(hex_lines)
   
   cat(sprintf("Filtering %d messages by hex patterns...\n", length(hex_lines)))
   
@@ -259,9 +262,14 @@ process_hex_batch <- function(hex_lines) {
   static_hex <- hex_lines[is_static]
   
   # Is tanker check - get vector
-  is_tanker_vec <- sapply(static_hex, is_tanker_hex)
-  # Filter by tanker check vector
-  tanker_hex_lines <- static_hex[is_tanker_vec]
+  if (length(static_hex) == 0) {
+    tanker_hex_lines <- character(0)
+  } else {
+    is_tanker_vec <- sapply(static_hex, is_tanker_hex)
+    tanker_hex_lines <- static_hex[is_tanker_vec]
+  }
+  # Filter by tanker check vector - delete?
+  # tanker_hex_lines <- static_hex[is_tanker_vec]
   
   cat(sprintf("Found: %d static (%d tankers), %d position\n",
               sum(is_static), length(tanker_hex_lines), sum(is_position)))
@@ -274,12 +282,12 @@ process_hex_batch <- function(hex_lines) {
   
   # Parse tanker static messages in parallel (6 cores)
   static_list <- mclapply(tanker_hex_lines, parse_static_tanker, mc.cores = 6)
-  static_parse_errors <- sum(sapply(static_list, is.null))  # Count NULLs
+  static_parse_errors <- sum(unlist(sapply(static_list, is.null)))  # Count NULLs
   static_list <- rbindlist(static_list[!sapply(static_list, is.null)])
   
   # Update tanker MMSI registry - should i have this as a hashmap / env 
   if (nrow(static_list) > 0) {
-    new_mmsis <- unique(static_list$mmsi)
+    new_mmsis <- unique(static_list[["mmsi"]])
     tanker_mmsis <<- unique(c(tanker_mmsis, new_mmsis))
     cat(sprintf("[REGISTRY] Tanker MMSI count: %d (added %d new)\n", 
                 length(tanker_mmsis), length(new_mmsis)))
@@ -310,7 +318,6 @@ process_hex_batch <- function(hex_lines) {
     # ##############################################
     # # (d) Parse tanker dynamic/position messages #
     # ##############################################
-    
     if (length(position_hex_tankers) > 0) {
       
       cat(sprintf("Parsing %d tanker position messages...\n", 
@@ -330,7 +337,7 @@ process_hex_batch <- function(hex_lines) {
         cat(sprintf("Deduplicating %d messages...\n", nrow(dynamic_list)))
         
         # Round time to minute
-        dynamic_list[, time_minute := as.POSIXct(format(time_utc, "%Y-%m-%d %H:%M:0S"), tz = "UTC")]
+        dynamic_list[, time_minute := as.POSIXct(format(time_utc, "%Y-%m-%d %H:%M:%S"), tz = "UTC")]
         
         # Sort by time (latest first)
         setorder(dynamic_list, mmsi, time_minute, -time_utc)
@@ -449,34 +456,33 @@ repeat {
         processed <- process_hex_batch(hex_chunk)
         
         # Update stats
-        # stats_counter$hex_filtered_static <- stats_counter$hex_filtered_static + processed$stats_updates$hex_filtered_static
-        # stats_counter$hex_filtered_position <- stats_counter$hex_filtered_position + processed$stats_updates$hex_filtered_position
-        # stats_counter$hex_filtered_tankers <- stats_counter$hex_filtered_tankers + processed$stats_updates$hex_filtered_tankers
-        # stats_counter$parsed_static_tankers <- stats_counter$parsed_static_tankers + processed$stats_updates$parsed_static_tankers
-        # stats_counter$parsed_dynamic <- stats_counter$parsed_dynamic + processed$stats_updates$parsed_dynamic
-        # stats_counter$dynamic_filtered_out <- stats_counter$dynamic_filtered_out + processed$stats_updates$dynamic_filtered_out
-        # stats_counter$dynamic_kept <- stats_counter$dynamic_kept + processed$stats_updates$dynamic_kept
-        # stats_counter$dynamic_deduped <- stats_counter$dynamic_deduped + processed$stats_updates$dynamic_deduped
-        # stats_counter$parse_errors <- stats_counter$parse_errors + processed$stats_updates$parse_errors
+        stats_counter$hex_filtered_static <- stats_counter$hex_filtered_static + processed$stats_updates$hex_filtered_static
+        stats_counter$hex_filtered_position <- stats_counter$hex_filtered_position + processed$stats_updates$hex_filtered_position
+        stats_counter$hex_filtered_tankers <- stats_counter$hex_filtered_tankers + processed$stats_updates$hex_filtered_tankers
+        stats_counter$parsed_static_tankers <- stats_counter$parsed_static_tankers + processed$stats_updates$parsed_static_tankers
+        stats_counter$parsed_dynamic <- stats_counter$parsed_dynamic + processed$stats_updates$parsed_dynamic
+        stats_counter$dynamic_filtered_out <- stats_counter$dynamic_filtered_out + processed$stats_updates$dynamic_filtered_out
+        stats_counter$dynamic_kept <- stats_counter$dynamic_kept + processed$stats_updates$dynamic_kept
+        stats_counter$dynamic_deduped <- stats_counter$dynamic_deduped + processed$stats_updates$dynamic_deduped
+        stats_counter$parse_errors <- stats_counter$parse_errors + processed$stats_updates$parse_errors
         
         # Safe update stats - fixed itself before I implemented it - turn to function
-        stats_counter$hex_filtered_static <- stats_counter$hex_filtered_static + as.numeric(processed$stats_updates$hex_filtered_static %||% 0)
-        stats_counter$hex_filtered_position <- stats_counter$hex_filtered_position + as.numeric(processed$stats_updates$hex_filtered_position %||% 0)
-        stats_counter$hex_filtered_tankers <- stats_counter$hex_filtered_tankers + as.numeric(processed$stats_updates$hex_filtered_tankers %||% 0)
-        stats_counter$parsed_static_tankers <- stats_counter$parsed_static_tankers + as.numeric(processed$stats_updates$parsed_static_tankers %||% 0)
-        stats_counter$parsed_dynamic <- stats_counter$parsed_dynamic + as.numeric(processed$stats_updates$parsed_dynamic %||% 0)
-        stats_counter$dynamic_filtered_out <- stats_counter$dynamic_filtered_out + as.numeric(processed$stats_updates$dynamic_filtered_out %||% 0)
-        stats_counter$dynamic_kept <- stats_counter$dynamic_kept + as.numeric(processed$stats_updates$dynamic_kept %||% 0)
-        stats_counter$dynamic_deduped <- stats_counter$dynamic_deduped + as.numeric(processed$stats_updates$dynamic_deduped %||% 0)
-        stats_counter$parse_errors <- stats_counter$parse_errors + as.numeric(processed$stats_updates$parse_errors %||% 0)
-        
+        # stats_counter[["hex_filtered_static"]] <- stats_counter[["hex_filtered_static"]] + as.numeric(processed[["stats_updates"]][["hex_filtered_static"]] %||% 0)
+        # stats_counter[["hex_filtered_position"]] <- stats_counter[["hex_filtered_position"]] + as.numeric(processed[["stats_updates"]][["hex_filtered_position"]] %||% 0)
+        # stats_counter[["hex_filtered_tankers"]] <- stats_counter[["hex_filtered_tankers"]] + as.numeric(processed[["stats_updates"]][["hex_filtered_tankers"]] %||% 0)
+        # stats_counter[["parsed_static_tankers"]] <- stats_counter[["parsed_static_tankers"]] + as.numeric(processed[["stats_updates"]][["parsed_static_tankers"]] %||% 0)
+        # stats_counter[["parsed_dynamic"]] <- stats_counter[["parsed_dynamic"]] + as.numeric(processed[["stats_updates"]][["parsed_dynamic"]] %||% 0)
+        # stats_counter[["dynamic_filtered_out"]] <- stats_counter[["dynamic_filtered_out"]] + as.numeric(processed[["stats_updates"]][["dynamic_filtered_out"]] %||% 0)
+        # stats_counter[["dynamic_kept"]] <- stats_counter[["dynamic_kept"]] + as.numeric(processed[["stats_updates"]][["dynamic_kept"]] %||% 0)
+        # stats_counter[["dynamic_deduped"]] <- stats_counter[["dynamic_deduped"]] + as.numeric(processed[["stats_updates"]][["dynamic_deduped"]] %||% 0)
+        # stats_counter[["parse_errors"]] <- stats_counter[["parse_errors"]] + as.numeric(processed[["stats_updates"]][["parse_errors"]] %||% 0)
         
         # Accumulate results
-        if (nrow(processed$static) > 0) {
-          all_static[[length(all_static) + 1]] <- processed$static
+        if (nrow(processed[["static"]]) > 0) {
+          all_static[[length(all_static) + 1]] <- processed[["static"]]
         }
-        if (nrow(processed$dynamic) > 0) {
-          all_dynamic[[length(all_dynamic) + 1]] <- processed$dynamic
+        if (nrow(processed[["dynamic"]]) > 0) {
+          all_dynamic[[length(all_dynamic) + 1]] <- processed[["dynamic"]]
         }
         
         # Memory management
@@ -531,12 +537,11 @@ repeat {
            dynamic_counter = dynamic_file_counter)
       
     }, error = function(e) {
-      cat(sprintf("[ERROR] Failed to process %s: %s\n", basename(hex_file), e$message))
       
       # Log error
       write(sprintf("%s [PROCESS 2 ERROR] File: %s, Error: %s\n", 
                     Sys.time(), basename(hex_file), e$message),
-            file = "logs/error_log.txt", append = TRUE)
+            file = "logs/error_log.log", append = TRUE)
       
       # Delete partial output if exists 
       # if (exists("static_out_file") && file.exists(static_out_file)) {
@@ -546,16 +551,17 @@ repeat {
       #   file.remove(dynamic_out_file)
       # }
       
-      # Close connection if open
-      if (exists("con") && isOpen(con)) {
-        close(con)
-      }
+      tryCatch(if (isOpen(con)) close(con), error = function(e) NULL)
       
       # Return failure with current stats
+      # list(success = FALSE, 
+      #      stats = stats_counter, 
+      #      static_counter = static_file_counter,
+      #      dynamic_counter = dynamic_file_counter)
       list(success = FALSE, 
-           stats = stats_counter, 
-           static_counter = static_file_counter,
-           dynamic_counter = dynamic_file_counter)
+           stats = get("stats_counter", envir = globalenv()),
+           static_counter = get("static_file_counter", envir = globalenv()),
+           dynamic_counter = get("dynamic_file_counter", envir = globalenv()))
     })
     
     # Update stats/counters
@@ -594,7 +600,7 @@ repeat {
   actually_parsed <- stats_counter$parsed_static_tankers + stats_counter$parsed_dynamic
   if (total_processed > 0) {
     speedup_ratio <- total_processed / max(actually_parsed, 1)
-    cat(sprintf("Hex optimization: Avoided parsing %d messages (%.1fx speedup)\n",
+    cat(sprintf("Hex: Avoided parsing %d messages (%.1fx speedup)\n",
                 total_processed - actually_parsed, speedup_ratio))
   }
   cat("------------------------------------------------------------------------------\n\n")

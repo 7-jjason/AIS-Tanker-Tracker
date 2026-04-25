@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# setwd("/Users/josephjason/Documents/Forecasting/R/projects/AIS Tanker Tracker")
+# setwd("/AIS Tanker Tracker")
 # #############################################################################
 # # Smart Launcher - WiFi Check + Auto-Restart                               #
 # #############################################################################
@@ -80,7 +80,6 @@ kill_existing_processes <- function() {
     still_running <- system("ps aux | grep -E 'process_[1-4]' | grep -v grep | wc -l",
                             intern = TRUE)
     if (as.numeric(trimws(still_running)) == 0) {
-      cat("[CLEANUP] All processes stopped\n")
     } else {
       cat("[CLEANUP] Processes still running\n")
     }
@@ -151,7 +150,6 @@ repeat {
   if (file.exists("STOP_AIS.txt")) {
     cat("\n[STOP] Stop file detected. Shutting down...\n")
     kill_existing_processes()
-    
     # Remove stop file for next run
     tryCatch({
       file.remove("STOP_AIS.txt")

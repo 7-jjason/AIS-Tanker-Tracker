@@ -2,8 +2,7 @@
 # # PROCESS 1: WebSocket Receiver                                              #
 # ##############################################################################
 # Purpose: connect to AIS stream, receive hex messages, buffer and save to disk                                                              
-# Output: raw_hex_YYYYMMDD_nnn.txt files         
-# Fast as fuck boi
+# Output: raw_hex_YYYYMMDD_nnn.txt files  
 
 # (0) Initialize  ----------------------------------------------------------
 
@@ -25,18 +24,18 @@ file_counter <- 1
 current_file <- paste0(data_dir, "/raw_hex_", current_date, "_", 
                        sprintf("%03d", file_counter), ".txt")
 
-# Stats counter
+# Initialize stats counters
 total_messages <- 0
 total_files_written <- 0
 
-# Init buffer 
+# Initialize buffer s
 buffer_size <- 50000  # messages
 buffer_time <- 15     # seconds
 hex_buffer <- character(buffer_size)
 buffer_index <- 0
 last_flush <- Sys.time()
 
-# (2) Helper Functions -----------------------------------------------------
+# (2) Helper Function ------------------------------------------------------
 
 # Flush buffer to disk
 flush_buffer <- function() {
@@ -110,7 +109,7 @@ create_ais_socket <- function() {
     
     # Time since last flush
     time_elapsed <- as.numeric(difftime(Sys.time(), last_flush, units = "secs"))
-    # If greater than 1000 messages/lines of hex or greater than 1 second
+    # If greater than X messages/lines of hex or greater than 1 second
     if (buffer_index >= buffer_size || time_elapsed >= buffer_time) {
       # Write lines to file, clean memory, start a new file
       flush_buffer()
@@ -130,7 +129,7 @@ create_ais_socket <- function() {
     cat(sprintf("[ERROR] Socket error: %s\n", event$message))
     # Log to error file
     write(sprintf("%s [WEBSOCKET ERROR] %s\n", Sys.time(), event$message),
-          file = "logs/error_log.txt", append = TRUE)
+          file = "logs/error_log.log", append = TRUE)
   })
   # Connect and return
   new_ws$connect()
@@ -154,6 +153,9 @@ max_delay <- 60  # 60s cap for backoff
 ws <- NULL       
 last_message_time <- Sys.time()
 
+# Close previous connections if any
+if (!is.null(ws)) ws$close()
+
 # Main event loop
 tryCatch({
   repeat {
@@ -162,7 +164,6 @@ tryCatch({
     if (file.exists("STOP_AIS.txt")) {
       cat("\n[STOP] Emergency stop file detected. Shutting down...\n")
       flush_buffer()
-      if (!is.null(ws)) ws$close()
       break
     }
     
@@ -219,7 +220,7 @@ tryCatch({
 }, error = function(e) {
   cat(sprintf("[ERROR] %s\n", e$message))
   write(sprintf("%s [FATAL] %s\n", Sys.time(), e$message),
-        file = "logs/error_log.txt", append = TRUE)
+        file = "logs/error_log.log", append = TRUE)
   try(flush_buffer(), silent = FALSE)
   if (!is.null(ws)) try(ws$close(), silent = FALSE)
 })

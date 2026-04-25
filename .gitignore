@@ -8,7 +8,9 @@ data/port_list_2.rds
 data/filtered/filtered_*
 data/archived/filtered_*
 files/db_password.R
-
+donotinclude.R
+*.pdf
+process_4_archive_to_postgreSQL.R
 # Ignore sensitive API keys (AIS)
 ais_api_key.R
 

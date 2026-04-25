@@ -3,9 +3,9 @@
 # #############################################################################
 
 # #############################################################################
-# # (0) Initialize  ----------------------------------------------------------
+# # (0) Initialize  --------------------------------------------------------- #
 # #############################################################################
-setwd("/Users/josephjason/Documents/Forecasting/R/projects/AIS Tanker Tracker")
+
 suppressPackageStartupMessages({
   library(data.table)
   library(dplyr)
@@ -204,9 +204,9 @@ port_dt <- rbindlist(lapply(names(master_port_list), function(group_name) {
 }))
 setkey(port_dt, lat_min, lat_max)
 
-# ##########################################################################
-# # MARAD Dimensions Lookup - # Papanikolaou "Ship Design Methodologies of #
-# # Preliminary Design: https://doi.org/10.1007/978-94-017-8751-2          #
+# ############################################################################
+# # MARAD Dimensions Lookup - # Papanikolaou "Ship Design Methodologies of   #
+# # Preliminary Design: https://doi.org/10.1007/978-94-017-8751-2            #
 # ##########################################################################
 
 MARAD <- data.table(
@@ -271,7 +271,7 @@ clean_ais_data <- function(static, dynamic) {
       if (.N > 2) {
         # Subset draught dbscan
         db_result <- dbscan(as.matrix(.SD$draught), eps = 2, minPts = 2)
-        # Keep core points
+        # Keep core and border points, not noise
         .SD[db_result$cluster != 0]
       } else {
         .SD
@@ -324,21 +324,21 @@ clean_ais_data <- function(static, dynamic) {
                        cog <= 360, ]
  
   # Clean cog data - shelve it for now
-  # minute_threshold <- 6
-  # dynamic[, cog := {
-  #   time_diff_prev <- as.numeric(difftime(time_utc, shift(time_utc, 1), units = "mins"))
-  #   time_diff_next <- as.numeric(difftime(shift(time_utc, -1), time_utc, units = "mins"))
-  #   cog_diff_prev <- abs((cog - shift(cog, 1) + 180) %% 360 - 180)
-  #   cog_diff_next <- abs((cog - shift(cog, -1) + 180) %% 360 - 180)
-  #   # If a large change in cog occurs over a short time
-  #   fifelse(time_diff_prev < minute_threshold &
-  #             time_diff_next < minute_threshold &
-  #             (cog_diff_prev > 30 & cog_diff_next > 30),
-  #           # Replace with average of adjacent trajectory points
-  #           (shift(cog, 1) + shift(cog, -1))/2,
-  #           # Else cog
-  #           cog)
-  # }, by = mmsi]
+  minute_threshold <- 6
+  dynamic[, cog := {
+    time_diff_prev <- as.numeric(difftime(time_utc, shift(time_utc, 1), units = "mins"))
+    time_diff_next <- as.numeric(difftime(shift(time_utc, -1), time_utc, units = "mins"))
+    cog_diff_prev <- abs((cog - shift(cog, 1) + 180) %% 360 - 180)
+    cog_diff_next <- abs((cog - shift(cog, -1) + 180) %% 360 - 180)
+    # If a large change in cog occurs over a short time
+    fifelse(time_diff_prev < minute_threshold &
+              time_diff_next < minute_threshold &
+              (cog_diff_prev > 30 & cog_diff_next > 30),
+            # Replace with average of adjacent trajectory points
+            (shift(cog, 1) + shift(cog, -1))/2,
+            # Else cog
+            cog)
+  }, by = mmsi]
   # Remove NA or invalid cogs
   dynamic_clean <- dynamic
   if (nrow(dynamic_invalid) == 0) {dynamic_invalid <- data.table()}
@@ -377,23 +377,22 @@ detect_draught_changes <- function(static) {
   # Remove repetitive data
   static[, change := draught != shift(draught, 1), by = mmsi]
   static <- static[change == TRUE | shift(change, 1, type = "lead") == TRUE]
+  
   # Calculate draught differences
   static[, draught_diff := draught - shift(draught, 1), by = mmsi]
   static[, prev_date_seconds := shift(date_seconds, 1), by = mmsi]
   
-  # Time difference between draught changes
+  # Calculate time difference between draught changes
   static[, time_diff_hours := (date_seconds - prev_date_seconds) / 3600]
   
-  # Haversine setup
+  # Setup for Haversine distance
   static[, `:=`(prev_lat = shift(lat, 1), prev_lon = shift(lon, 1)), by = mmsi]
   
   # Only calculate distance where we have valid coordinate pairs
   valid_coords_idx <- which(!is.na(static$prev_lat) & !is.na(static$lat))
-  
   if (length(valid_coords_idx) > 0) {
     coords_prev <- static[valid_coords_idx, .(prev_lon, prev_lat)]
     coords_curr <- static[valid_coords_idx, .(lon, lat)]
-    
     # Update only the valid rows (distance travelled in kms)
     static[valid_coords_idx, distance_km := distHaversine(coords_prev, coords_curr) / 1000]
   }
@@ -403,22 +402,24 @@ detect_draught_changes <- function(static) {
   
   # Filter thresholds: >1m change, >12h time gap, >10km distance
   # Zhang et al. uses: time_diff_hours = 12, distance = 12
-  # Mine accomodate smaller vessels taking oil from larger vessels to port
-  events <- static[abs(draught_diff) > 1]
-                     # time_diff_hours > 1]
-                     # distance_km > 2
+  # Mine accommodate smaller vessels taking oil from larger vessels to port
+  events <- static[abs(draught_diff) > 1 &
+                   time_diff_hours > 12 &
+                   distance_km > 12]
   
   # I think I can remove this now that I have the other missing counters
-  events_rm <- static[!(abs(draught_diff)) > 1] 
-                        # time_diff_hours <= 1]
-                        # distance_km > 2
+  events_rm <- static[!(abs(draught_diff)) > 1 &
+                      time_diff_hours <= 12 &
+                      distance_km <= 12]
   
   cat(sprintf("[DRAUGHT] Detected %d significant draught change events\n", nrow(events)))
   
-  # Estimate dwt from length (equation estimated in dwt_estimation.R)
-  events[, est_dwt := -5.7435 + 3.1366 * log(length_m)]
-  events[, est_dwt := exp(est_dwt)]
-  # Estimate draught from Kalokairinos et al. regression
+  # TO ESTIMATE DWT ACCOUNTING FOR BALLAST
+  
+  # Estimate DWT from length (equation estimated in dwt_estimation.R)
+  events[, est_dwt := -971.2256 + 1.0273 * length_m * breadth_m * draught]
+  
+  # Estimate draught from Kalokairinos et al. (2000-2005) in Papanikolaou's "Ship Design" (2014) (p. 474)
   events[, design_draught := 0.45011 * (est_dwt ^ 0.303134)]
   
   # Calculate length/beam and beam/draught ratios
@@ -456,22 +457,25 @@ detect_draught_changes <- function(static) {
   setDT(events)
 
   # Calculate waterplane area coefficients and cargo quantities:
-  # (Schneekluth and Bertram "Ship Design for Efficiency and Economy", p. 11)
+  # Schneekluth and Bertram "Ship Design for Efficiency and Economy", p. 11
   events[, waterplane_c := (1 + 2 * (block_c / middle_c)) / 3]
+  
   # Tonnes per centimeter immersion estimates = waterplane area * saltwater density * 100
+  # Zhang et. al.
   events[, tpci := length_m * breadth_m * waterplane_c * 1.025 / 100]
   # DWT change (tonnes) = TPCI * draught_diff (m) * 100 (cm/m conversion)
   events[, dwt_change := tpci * draught_diff * 100]
+  
   # Absolute mass (tonnes)
   events[, abs_mass := abs(dwt_change)]
+  
   # Calculate displacement
+  # Variable Lightweight in Prakash and Smith's "Estimating vessel payloads in bulk shipping using AIS Data" 
   events[, displacement := length_m * breadth_m * design_draught * block_c * 1.025, by = mmsi]
+  
   # Estimate Lightship (only ship weight, metric tonnes) using regression equation from Papanikolaou, A. (2014). Ship Design: Methodologies of Preliminary Design (p. 459). Springer.
   events[, lightship_tonnage := 2.9186 * (displacement ^ 0.75548)]
-  # Estimate DWT by differencing total mass of water displaced - dry ship
-  # events[, est_dwt := displacement - lightship_tonnage]
-  # Estimate the minimum light ballast needed in meters for tankers from MARPOL 73/78
-  # https://www.marpoltraininginstitute.com/MMSKOREAN/MARPOL/Annex_I/r18.htm
+  # Estimate light ballast meters
   events[, light_ballast_m := 2.0 + 0.02 * length_m]
   # Estimate the light ballast in metric tonnes
   events[, light_ballast_tonnes := (tpci * 100 * light_ballast_m) - lightship_tonnage]
@@ -484,7 +488,7 @@ detect_draught_changes <- function(static) {
   # Convert cargo into barrels
   events[, cargo_barrels_change := cargo_tonnes_change * 7.3]
   
-  # Set event type
+  # Classify event type
   events[, event_type := fifelse(draught_diff > 0, "loading", "level")]
   events[draught_diff < 0, event_type := "unloading"]
   
@@ -503,6 +507,10 @@ detect_draught_changes <- function(static) {
 # ########################################
 # # Assign port names using spatial join #
 # ########################################
+
+# fix this such that there aren't multiple lookup tables as we had when working with thresholds/bands
+# for vessels to pass through. instead, we should find the lon/lat, find the nation, and map it to
+# the closest port within that nation, via a single lookup table.
 
 assign_port_names <- function(dynamic, port_lookup) { 
   
@@ -566,7 +574,8 @@ find_berthing_event <- function(segment) {
     return(NULL)
   }
   
-  # If all speeds are the same (e.g., all 0), GMM cannot calculate variance
+  # If all speeds are the same, GMM cannot calculate variance
+  # Need enough observations
   sog_clean <- segment$sog[!is.na(segment$sog)]
   if (length(sog_clean) < 3 || length(unique(sog_clean)) < 2) {
     return(list(success = FALSE, data = segment))
@@ -752,7 +761,7 @@ run_zhang_pipeline <- function(static, dynamic) {
   class_lookup_errors <- results_dt[!vessel_class_lookup,
                                     on = .(abs_mass >= min_dwt, abs_mass <= max_dwt)]
   
-  # Step 6: Classify vessels by cargo capacity
+  # Classify vessels by cargo capacity
   final_results <- vessel_class_lookup[results_dt, 
                                        on = .(min_dwt <= abs_mass, max_dwt >= abs_mass),
                                        .(mmsi, 
@@ -960,7 +969,7 @@ repeat {
           # Find most recent file by date time
           most_recent <- all_processed_files[which.max(file_times)]
 
-          # Remove all excent most recent
+          # Remove all except most recent
           to_remove <- all_processed_files[all_processed_files != most_recent]
           file.remove(to_remove)
           cat(sprintf("[CLEANUP] Removed %d old processed files, kept most recent\n", length(to_remove)))
@@ -1028,3 +1037,8 @@ repeat {
 }
 
 cat("[SYSTEM] Process 3 terminated.\n")
+
+
+
+
+

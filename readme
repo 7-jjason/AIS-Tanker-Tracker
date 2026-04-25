@@ -11,7 +11,7 @@ This program:
 
 To run:
 - Ensure you have an API key for aisstream.io. You need a github account to 
-  register. I've also included one but it can be spotty if shared. 
+  register. 
 - Ensure your working directory path ends in "/ais_pls".
 - "source" setup.R and ensure you pass the checks.
   - You can adjust the mc.cores argument in process_2_parser_filter.R. 
