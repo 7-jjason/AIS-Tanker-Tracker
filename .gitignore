@@ -10,6 +10,7 @@ data/archived/filtered_*
 data/processed/
 data/output/
 files/db_password.R
+dwt_estimation.R
 
 *.pdf
 process_4_archive_to_postgreSQL.R
