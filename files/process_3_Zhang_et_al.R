@@ -44,7 +44,7 @@ cycle_interval_mins <- 1 * 24 * 60  # Minutes
 
 # Cumulative stats
 stats_total <- list(
-  files_processed = 0,
+  cycles_ran = 0,
   static_records = 0,
   dynamic_records = 0,
   load_errors = 0,
@@ -209,8 +209,8 @@ clean_ais_data <- function(static, dynamic) {
     vessels_processed <- uniqueN(static$mmsi)
     stats_count$dbscan_vessels_processed <<- stats_count$dbscan_vessels_processed + vessels_processed
     stats_count$static_outliers_removed <<- stats_count$static_outliers_removed + nrow(static_outliers)
-    cat(sprintf("[DBSCAN] Processed %d vessels: kept %d, removed %d outliers\n",
-                vessels_processed, uniqueN(static_clean$mmsi), nrow(static_outliers)))
+    cat(sprintf("[DBSCAN] Processed %d vessels, removed %d outliers\n",
+                vessels_processed, nrow(static_outliers)))
     
   } else { # if DBSCAN isn't successful
     # pass static
@@ -303,9 +303,9 @@ clean_ais_data <- function(static, dynamic) {
   n_before_dynamic_dedup <- nrow(dynamic_clean)
   
   static_clean[, `:=` (
-    lat_check = round(lat, 0),
-    lon_check = round(lon, 0),
-    date_seconds_check = round(date_seconds/100, 0)
+    lat_check = round(lat, 1),
+    lon_check = round(lon, 1),
+    date_seconds_check = round(date_seconds/10, 0)
   )]
   # distinct instead?
   static_clean <- unique(static_clean, by = c("mmsi", "lat_check", "lon_check", "draught", "date_seconds_check"))
@@ -313,9 +313,9 @@ clean_ais_data <- function(static, dynamic) {
   stats_count$static_dedup_removed <<- stats_count$static_dedup_removed + (n_before_static_dedup - nrow(static_clean))
 
   dynamic_clean[, `:=` (
-    lat_check = round(lat, 0),
-    lon_check = round(lon, 0),
-    date_seconds_check = round(date_seconds/100, 0)
+    lat_check = round(lat, 1),
+    lon_check = round(lon, 1),
+    date_seconds_check = round(date_seconds/10, 0)
   )]
   dynamic_clean <- unique(dynamic_clean, by = c("mmsi", "lat", "lon", "date_seconds_check"))
   dynamic_clean[, `:=` (lat_check = NULL, lon_check = NULL, date_seconds_check = NULL)]
@@ -370,7 +370,7 @@ detect_draught_changes <- function(static) {
   # Remove repetitive data
   static[, change := draught != shift(draught, 1), by = mmsi]
   # Filter to keep where changes occur
-  static <- static[change == TRUE | shift(change, 1, type = "lead") == TRUE]
+  static <- static[change == TRUE | shift(change, 1, type = "lead") == TRUE, by = mmsi]
   
   # Calculate draught differences
   static[, draught_diff := draught - shift(draught, 1), by = mmsi]
@@ -399,8 +399,8 @@ detect_draught_changes <- function(static) {
   
   # Filter thresholds: >1m change, >12h time gap, >10km distance
   draught_threshold <- 1
-  time_threshold <- 0
-  distance_threshold <- 0
+  time_threshold <- 1
+  distance_threshold <- 1
   
   events <- static[abs(draught_diff) > draught_threshold &
                      time_diff_hours > time_threshold &
@@ -605,7 +605,7 @@ run_zhang_pipeline <- function(static, dynamic) {
            "ship_name",
            "ship_name_1")
   # Join dynamic (events_cl) with static data (draught_events) 
-  # some rows are not matching to dynamic data but are returned - missing lat, lon, ...
+  # how 
   synchronized_events <- dynamic_clean[draught_events, 
                                        on = .(mmsi, 
                                               time_utc >= start_bound,
@@ -613,6 +613,8 @@ run_zhang_pipeline <- function(static, dynamic) {
                                        allow.cartesian = TRUE]
   
   synchronized_events[, ship_name_1 := NULL]
+  # okay to lose silently
+  synchronized_unmatched <- synchronized_events[!complete.cases(synchronized_events), ]
   synchronized_events <- na.omit(synchronized_events)
   
   cat(sprintf("[SYNC] Matched %d dynamic points to %d draught events\n",
@@ -623,17 +625,6 @@ run_zhang_pipeline <- function(static, dynamic) {
   # Find berthing events using GMM
   final_results <- synchronized_events[, {
     segment <- .SD # subset to current mmsi
-    
-    if (.GRP %% 5 == 0) {  # Every 5th vessel
-      cat(sprintf("\r[GMM] Processing %d...", .GRP))
-    }
-    
-    # Validate required columns
-    if (!all(c("sog", "time_utc", "date_seconds") %in% names(segment))) {
-      cat(sprintf("[ERROR] Missing columns in .SD for group mmsi=%d\n", mmsi[1]))
-      stats_count$gmm_null_returns <<- stats_count$gmm_null_returns + 1
-      return(NULL)
-    }
     
     gmm_check <- find_berthing_event(segment)
     
@@ -680,9 +671,12 @@ run_zhang_pipeline <- function(static, dynamic) {
   # Filter for enough trajectory points
   final_results[, min_traj_points := (as.numeric(window_end) - as.numeric(window_start))/360, by = mmsi]
   n_before_traj_filter <- nrow(final_results)
+  final_results_c <- copy(final_results)
   final_results <- final_results[, if (.N >= min_traj_points[1]) .SD, by = mmsi]
   stats_count$traj_points_filter_removed <<- stats_count$traj_points_filter_removed + (n_before_traj_filter - nrow(final_results))
-    
+  # Track errors
+  traj_rm <- final_results_c[!final_results, on = "mmsi"]
+  
   final_results <- assign_port_names(final_results)
   
   cat(sprintf("[COMPLETE] Pipeline finished. %d cargo events identified.\n", 
@@ -691,17 +685,19 @@ run_zhang_pipeline <- function(static, dynamic) {
   return(list(
     final = final_results, 
     missing = list(
-      static_na, 
+      static_na = static_na, 
       static_abnormal = static_ab,
-      static_outlier,
-      dynamic_na,
+      static_outlier = static_outlier,
+      dynamic_na = dynamic_na,
       dynamic_abnormal = dynamic_ab,
-      dynamic_errors,
-      draught_rm,
-      draught_error_small,
-      draught_error_static,
-      marad_error,
-      gmm = gmm_error_table)
+      dynamic_errors = dynamic_errors,
+      draught_rm = dynamic_errors,
+      draught_error_small = draught_error_small,
+      draught_error_static = draught_error_static,
+      marad_error = marad_error,
+      gmm = gmm_error_table,
+      traj_rm = traj_rm,
+      synchronized_unmatched = synchronized_unmatched)
   ))
 }
 
@@ -812,7 +808,7 @@ repeat {
         cat(sprintf("[SAVED] Processed results → %s\n", basename(processed_out_file)))
         
         # Update statistics
-        stats_total$files_processed <- stats_total$files_processed + 1
+        stats_total$cycles_ran <- stats_total$cycles_ran + 1
         stats_count$draught_events_detected <- stats_count$draught_events_detected + 
           nrow(results$final)
         stats_total$draught_events_cumulative <- stats_total$draught_events_cumulative + nrow(results$final)
@@ -919,7 +915,7 @@ repeat {
     cat("PROCESS 3: Cycle Complete\n")
     
     cat(sprintf("  Cycle duration: %.1f seconds\n", cycle_duration))
-    cat(sprintf("  Files processed: %d\n", stats_total$files_processed))
+    cat(sprintf("  Cycles ran: %d\n", stats_total$cycles_ran))
     cat(sprintf("  Draught events cumulative: %d\n", stats_total$draught_events_cumulative))
     cat(sprintf("  Observations removed: %d\n", total_removed))
     cat(sprintf("  Static records: %d\n", stats_total$static_records))
