@@ -207,7 +207,7 @@ setkey(port_dt, lat_min, lat_max)
 # ############################################################################
 # # MARAD Dimensions Lookup - # Papanikolaou "Ship Design Methodologies of   #
 # # Preliminary Design: https://doi.org/10.1007/978-94-017-8751-2            #
-# ##########################################################################
+# ############################################################################
 
 MARAD <- data.table(
   parameter = LETTERS[1:16],

@@ -43,7 +43,10 @@ Each confirmed event record includes vessel identifiers, event type (loading/unl
 - DWT regression carries uncertainty; planned upgrade to cluster-stratified or tree-based model.
 - Single terrestrial AIS feed causes offshore coverage gaps.
 - 61 hardcoded port bounding boxes; unmatched locations labelled *Lost at Sea*.
-- Floating storage and lightering events not yet classified.
+- Floating storage events not yet classified.
+- Vessel class lookup table could be better utilized with length and breadth.
+- DBSCAN minimum points should increase. If static data for a specific MMSI is streamed every 6 minutes, then 2 points implies that a tanker only spend 12 minutes at a specific draught. This is impractical for movement, or for loading/unloading. Additionally, it would capture the changes in draught as it occurs instead of the entire change in draught, giving multiple events for each event. Given that unloading/loading events can be as short as 8 hours and trips are almost always longer than 8 hours (and for our interests always are), I would suggest to use minimum points = 7 hours * 10 points/hour = 70, which provides leeway on the short end. 
+- The port-lookup table needs to be replaced. It is from a previous version that no longer requires all of its uses, so now it overly complicates the tables creation. 
 
 #### References
 <!--
@@ -110,4 +113,3 @@ U.S. Energy Information Administration. (2014). Tanker sizes and classes. https:
 
 - This project is a work in progress. All cargo estimates — including payload mass, draught changes, and barrel conversions — are approximations derived from AIS data and author-defined models; they are not guaranteed to be accurate and should not be treated as such.
 - Due to the concurrent, iterative nature of the four-process pipeline, processes can execute indefinitely (this is my intent). To be diligent before running this program, ensure you are familiar with your system's process management tools (Activity Monitor on macOS, Task Manager on Windows) so you can manually terminate processes if required.
-
