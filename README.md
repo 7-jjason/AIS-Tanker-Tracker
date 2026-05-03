@@ -13,24 +13,21 @@ Ingests live global AIS data, isolates tanker vessels, cleans the stream, and de
 | **P1 – Ingestion** | Connects to AISStream.io via WebSocket; buffers raw hex messages to disk. |
 | **P2 – Parser** | Pre-filters at hex level (no full deserialisation), parses tanker messages, deduplicates, writes RDS files. |
 | **P3 – Analysis** | Cleaning → draught-change detection -> GMM berthing confirmation -> payload estimation (24h cycle). |
-| **P4 – Storage** | Writes P2 output to MySQL for persistence. |
+| **P4 – Storage** | Writes P3 output to MySQL (not included here). |
 | **Background Launcher** | Runs each process, deals with WiFi connectivity, emergency shutdowns, and hung processes. | 
 
 #### Methods
 
-- **Tanker identification:** AIS ship type codes 80–89, matched at the hexadecimal level before parsing.
-- **Cleaning:** Deterministic bounds filtering + per-vessel DBSCAN on draught (ε = 2 m, minPts = 2).
+- **Cleaning:** Deterministic bounds filtering + per-vessel DBSCAN on draught (ε = 1 m, minPts = 2).
 - **Event detection:** Draught change > 1 m, elapsed time > 12 h, distance > 12 km (Zhang et al., 2025).
 - **Berthing confirmation:** Two-component GMM fitted to speed-over-ground; threshold = moored mean + 3σ.
-- **DWT estimation:** Author-derived OLS regression: `DWT = −971.23 + 1.03 × (L × B × d)`.
 - **Cargo mass:** TPCI × draught change, corrected for ballast (MARPOL light ballast formula + 5% DWT heavy ballast).
-- **Unit conversion:**Metric tonnes → barrels at 7.3 bbl/t (API standard).
 
 #### Key Dependencies
 
 - `dbscan`, `mclust`, `data.table`, `geosphere`.
 - AISStream.io API key.
-- Keep-Awake Utility. Use a keep-awake utility such as Caffeinate, Amphetamine, or a similar tool to prevent your system from sleeping during operation.
+- Keep-Awake Utility such as Caffeinate, Amphetamine, or a similar tool to prevent your system from sleeping during operation.
 
 #### Output
 
@@ -42,11 +39,8 @@ Each confirmed event record includes vessel identifiers, event type (loading/unl
 
 - DWT regression carries uncertainty; planned upgrade to cluster-stratified or tree-based model.
 - Single terrestrial AIS feed causes offshore coverage gaps.
-- 61 hardcoded port bounding boxes; unmatched locations labelled *Lost at Sea*.
 - Floating storage events not yet classified.
-- Vessel class lookup table could be better utilized with length and breadth.
 - DBSCAN minimum points should increase. If static data for a specific MMSI is streamed every 6 minutes, then 2 points implies that a tanker only spend 12 minutes at a specific draught. This is impractical for movement, or for loading/unloading. Additionally, it would capture the changes in draught as it occurs instead of the entire change in draught, giving multiple events for each event. Given that unloading/loading events can be as short as 8 hours and trips are almost always longer than 8 hours (and for our interests always are), I would suggest to use minimum points = 7 hours * 10 points/hour = 70, which provides leeway on the short end. 
-- The port-lookup table needs to be replaced. It is from a previous version that no longer requires all of its uses, so now it overly complicates the tables creation. 
 
 #### References
 <!--
