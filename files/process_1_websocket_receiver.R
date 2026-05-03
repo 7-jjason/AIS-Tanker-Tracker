@@ -20,7 +20,8 @@ data_dir <- "data/raw_hex"
 if (!dir.exists(data_dir)) dir.create(data_dir, recursive = TRUE)
 
 # Initialize file counter
-file_counter <- 1
+existing_files <- list.files(data_dir, pattern = paste0("raw_hex_", current_date, "_\\d+\\.txt"))
+file_counter <- length(existing_files) + 1
 current_file <- paste0(data_dir, "/raw_hex_", current_date, "_", 
                        sprintf("%03d", file_counter), ".txt")
 
@@ -121,7 +122,7 @@ create_ais_socket <- function() {
   
   # On close
   new_ws$onClose(function(event) {
-    cat(sprintf("[WARN] Socket closed. Code: %d, Reason: %s\n", event$code))
+    cat(sprintf("[WARN] Socket closed. Code: %d\n", event$code))
   })
   
   # On error

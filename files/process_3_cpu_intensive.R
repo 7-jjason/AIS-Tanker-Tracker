@@ -26,14 +26,11 @@ processed_dir <- "data/processed" # Print to
 if (!dir.exists(processed_dir)) dir.create(processed_dir, recursive = TRUE)
 if (!dir.exists("logs")) dir.create("logs")
 
-# Track processed files
-# processed_files_tracker <- character()
-
 # File counter
 processed_file_counter <- 1
 
 # Timing parameters
-cycle_interval_mins <- 1 * 24 * 60  # Minutes
+cycle_interval_mins <- 1 * 24 * 60  # in minutes -> every/24 hours
 
 # Statistics
 stats_count <- list(
@@ -50,159 +47,29 @@ stats_count <- list(
 # # (2) Lookup Table Setup ----------------------------------------------
 # #############################################################################
 
-# ###############
-# # Port Lookup #
-# ###############
+# #####################
+# # Port-lookup table #
+# #####################
 
-port_labels_chokepoints <- c(
-  "Fujairah_UAE", "Singapore_East", "Suez_South_EG", "Istanbul_South_TR", 
-  "Fredericia_DK", "Balboa_PA", "Skagen_STS_DK", "Batam_ID", 
-  "Gibraltar_East", "Cape_Town_SA"
-)
-port_bounding_boxes_chokepoints <- list(
-  list(list(25.00, 56.30), list(25.30, 56.60)),
-  list(list(1.20, 104.10), list(1.50, 104.40)),
-  list(list(29.70, 32.40), list(30.00, 32.70)),
-  list(list(40.80, 28.80), list(41.10, 29.10)),
-  list(list(55.45, 9.60),  list(55.75, 9.90)),
-  list(list(8.75, -79.65), list(9.05, -79.35)),
-  list(list(57.60, 10.50), list(57.90, 10.80)),
-  list(list(0.95, 103.80), list(1.25, 104.10)),
-  list(list(36.00, -5.30), list(36.30, -5.00)),
-  list(list(-34.00, 18.30), list(-33.70, 18.60))
-)
+ports_df <- fread('data/World Port Index/UpdatedPub150.csv',
+                  select = c(
+                    "OID_", 
+                    "Main Port Name", 
+                    "Country Code",
+                    "Latitude",
+                    "Longitude")
+) |>
+  mutate(
+    port_name = paste0(`Main Port Name`, ", ", `Country Code`)
+  ) |>
+  select(
+    port_name, 
+    lat = Latitude,
+    lon = Longitude
+  )
 
-port_labels_offshore_s <- c(
-  "Ras_Tanura_SA", "Mina_Al_Ahmadi_KW", "Basrah_ABOT_IQ", "Ras_Laffan_QA",
-  "Bonny_Island_NG", "Escravos_Offshore_NG", "Qua_Iboe_NG",
-  "Pointe_Noire_CG", "Malabo_Zafiro_GQ", "Lome_STS_TG"
-)
-port_bounding_boxes_offshore_s <- list(
-  list(list(26.30, 49.80), list(27.10, 50.60)),
-  list(list(28.80, 47.80), list(29.60, 48.60)),
-  list(list(29.40, 48.50), list(30.20, 49.30)),
-  list(list(25.70, 51.30), list(26.30, 52.10)),
-  list(list(3.90, 6.80),   list(4.70, 7.60)),
-  list(list(5.30, 4.70),   list(6.00, 5.40)),
-  list(list(3.90, 7.70),   list(4.60, 8.40)),
-  list(list(-5.20, 11.40), list(-4.40, 12.10)),
-  list(list(3.50, 8.00),   list(4.20, 8.70)),
-  list(list(5.70, 0.90),   list(6.40, 1.60))
-)
-
-port_labels_offshore_d <- c(
-  "Qingdao_CN", "Ningbo_Zhoushan_CN", "Dalian_CN", "Jamnagar_Sikka_IN",
-  "Mundra_IN", "Vadinar_IN", "Houston_Entrance_US", "LOOP_Offshore_US",
-  "Nederland_US", "Corpus_Christi_US"
-)
-port_bounding_boxes_offshore_d <- list(
-  list(list(35.90, 120.20), list(36.20, 120.50)),
-  list(list(29.70, 122.00), list(30.00, 122.30)),
-  list(list(38.90, 121.55), list(39.20, 121.85)),
-  list(list(22.40, 69.70),  list(22.70, 70.00)),
-  list(list(22.65, 69.60),  list(22.95, 69.90)),
-  list(list(22.30, 69.40),  list(22.60, 69.70)),
-  list(list(29.20, -94.80), list(29.50, -94.50)),
-  list(list(28.80, -90.10), list(29.10, -89.80)),
-  list(list(29.60, -94.00), list(29.90, -93.70)),
-  list(list(27.75, -97.10), list(28.05, -96.80))
-)
-
-port_labels_eu_med <- c(
-  "Rotterdam_NL", "Antwerp_BE", "Fos_sur_Mer_FR", "Trieste_IT",
-  "Piraeus_GR", "Augusta_IT", "Algeciras_Spain", "Sidi_Kerir_EG",
-  "Arzew_DZ", "Banias_SY"
-)
-port_bounding_boxes_eu_med <- list(
-  list(list(51.90, 3.80),   list(52.20, 4.10)),
-  list(list(51.35, 2.90),   list(51.65, 3.20)),
-  list(list(43.20, 4.70),   list(43.50, 5.00)),
-  list(list(45.50, 13.60),  list(45.80, 13.90)),
-  list(list(37.80, 23.00),  list(38.10, 23.30)),
-  list(list(37.10, 15.15),  list(37.40, 15.45)),
-  list(list(36.00, -5.45),  list(36.30, -5.15)),
-  list(list(31.05, 29.65),  list(31.35, 29.95)),
-  list(list(35.85, -0.35),  list(36.15, -0.05)),
-  list(list(35.10, 35.80),  list(35.40, 36.10))
-)
-
-port_labels_apac_latam <- c(
-  "Bontang_ID", "Bintulu_MY", "Karratha_AU", "Darwin_AU",
-  "Port_Bonython_AU", "Sao_Sebastiao_BR", "Angra_dos_Reis_BR",
-  "Jose_Terminal_VE", "Quintero_CL", "Map_Ta_Phut_TH"
-)
-port_bounding_boxes_apac_latam <- list(
-  list(list(-0.20, 117.30), list(0.50, 118.00)),
-  list(list(3.00, 112.80),  list(3.80, 113.60)),
-  list(list(-20.90, 116.40), list(-20.20, 117.10)),
-  list(list(-12.70, 130.50), list(-12.00, 131.20)),
-  list(list(-33.30, 137.40), list(-32.60, 138.10)),
-  list(list(-24.20, -45.70), list(-23.40, -45.00)),
-  list(list(-23.40, -44.60), list(-22.60, -43.90)),
-  list(list(9.80, -65.20),  list(10.50, -64.40)),
-  list(list(-33.10, -71.80), list(-32.30, -71.10)),
-  list(list(12.30, 100.90), list(13.00, 101.60))
-)
-
-port_labels_northern <- c(
-  "Primorsk_RU", "Ust_Luga_RU", "Novorossiysk_RU", "CPC_Terminal_RU",
-  "Kozmino_RU", "Prigorodnoye_RU", "Murmansk_RU", "Varandey_Offshore_RU",
-  "Vysotsk_RU", "Tuapse_RU"
-)
-port_bounding_boxes_northern <- list(
-  list(list(60.20, 28.50),  list(60.50, 28.80)),
-  list(list(59.60, 28.20),  list(59.90, 28.50)),
-  list(list(44.60, 37.75),  list(44.90, 38.05)),
-  list(list(44.55, 37.55),  list(44.85, 37.85)),
-  list(list(42.65, 133.00), list(42.95, 133.30)),
-  list(list(46.50, 142.80), list(46.80, 143.10)),
-  list(list(68.95, 33.00),  list(69.25, 33.30)),
-  list(list(68.80, 58.10),  list(69.10, 58.40)),
-  list(list(60.55, 28.40),  list(60.85, 28.70)),
-  list(list(44.00, 39.00),  list(44.30, 39.30))
-)
-
-port_labels_hormuz <- c("Strait_of_Hormuz_Gate")
-port_bounding_boxes_hormuz <- list(
-  list(list(26.20, 55.80), list(26.80, 56.60))
-)
-
-# Combine into master list
-master_port_list <- list(
-  "Group1_Chokepoints" = port_bounding_boxes_chokepoints,
-  "Group2_Offshore_s"  = port_bounding_boxes_offshore_s,
-  "Group3_Offshore_d"  = port_bounding_boxes_offshore_d,
-  "Group4_EuroMed"     = port_bounding_boxes_eu_med,
-  "Group5_APAC_Latam"  = port_bounding_boxes_apac_latam,
-  "Group6_Northern"    = port_bounding_boxes_northern,
-  "Group7_Hormuz"      = port_bounding_boxes_hormuz
-)
-
-# Add labels as names
-names(master_port_list$Group1_Chokepoints) <- port_labels_chokepoints
-names(master_port_list$Group2_Offshore_s) <- port_labels_offshore_s
-names(master_port_list$Group3_Offshore_d) <- port_labels_offshore_d
-names(master_port_list$Group4_EuroMed) <- port_labels_eu_med
-names(master_port_list$Group5_APAC_Latam) <- port_labels_apac_latam
-names(master_port_list$Group6_Northern) <- port_labels_northern
-names(master_port_list$Group7_Hormuz) <- port_labels_hormuz
-
-# Build port lookup data.table for fast spatial joins
-port_dt <- rbindlist(lapply(names(master_port_list), function(group_name) {
-  group <- master_port_list[[group_name]]
-  rbindlist(lapply(names(group), function(port_name) {
-    box <- group[[port_name]]
-    data.table(
-      port_name = port_name,
-      # Sets coordinates as min and max to always match 
-      lat_min = min(box[[1]][[1]], box[[2]][[1]]),
-      lat_max = max(box[[1]][[1]], box[[2]][[1]]),
-      lon_min = min(box[[1]][[2]], box[[2]][[2]]),
-      lon_max = max(box[[1]][[2]], box[[2]][[2]])
-    )
-  }))
-}))
-setkey(port_dt, lat_min, lat_max)
+# Port-lookup shapefile table
+ports_sf <- st_as_sf(ports_df, coords = c("lon", "lat"), crs = 4326)
 
 # ############################################################################
 # # MARAD Dimensions Lookup - # Papanikolaou "Ship Design Methodologies of   #
@@ -401,27 +268,20 @@ detect_draught_changes <- function(static) {
   draught_no_change <- static[draught_diff == 0]
   
   # Filter thresholds: >1m change, >12h time gap, >10km distance
-  # Zhang et al. uses: time_diff_hours = 12, distance = 12
-  # Mine accommodate smaller vessels taking oil from larger vessels to port
   events <- static[abs(draught_diff) > 1 &
                    time_diff_hours > 12 &
                    distance_km > 12]
   
-  # I think I can remove this now that I have the other missing counters
   events_rm <- static[!(abs(draught_diff)) > 1 &
                       time_diff_hours <= 12 &
                       distance_km <= 12]
   
   cat(sprintf("[DRAUGHT] Detected %d significant draught change events\n", nrow(events)))
   
-  # TO ESTIMATE DWT ACCOUNTING FOR BALLAST
-  
   # Estimate DWT from length (equation estimated in dwt_estimation.R)
   events[, est_dwt := -971.2256 + 1.0273 * length_m * breadth_m * draught]
-  
   # Estimate draught from Kalokairinos et al. (2000-2005) in Papanikolaou's "Ship Design" (2014) (p. 474)
   events[, design_draught := 0.45011 * (est_dwt ^ 0.303134)]
-  
   # Calculate length/beam and beam/draught ratios
   events[, length_beam := round(length_m / breadth_m * 2) / 2] # .5 increments 
   # max(draught) needs to be design draught instead
@@ -465,14 +325,10 @@ detect_draught_changes <- function(static) {
   events[, tpci := length_m * breadth_m * waterplane_c * 1.025 / 100]
   # DWT change (tonnes) = TPCI * draught_diff (m) * 100 (cm/m conversion)
   events[, dwt_change := tpci * draught_diff * 100]
-  
   # Absolute mass (tonnes)
   events[, abs_mass := abs(dwt_change)]
-  
-  # Calculate displacement
-  # Variable Lightweight in Prakash and Smith's "Estimating vessel payloads in bulk shipping using AIS Data" 
+  # Calculate displacement/variable lightweight in Prakash and Smith's "Estimating vessel payloads in bulk shipping using AIS Data" 
   events[, displacement := length_m * breadth_m * design_draught * block_c * 1.025, by = mmsi]
-  
   # Estimate Lightship (only ship weight, metric tonnes) using regression equation from Papanikolaou, A. (2014). Ship Design: Methodologies of Preliminary Design (p. 459). Springer.
   events[, lightship_tonnage := 2.9186 * (displacement ^ 0.75548)]
   # Estimate light ballast meters
@@ -487,7 +343,6 @@ detect_draught_changes <- function(static) {
   events[, cargo_tonnes_change := abs_mass + ballast_change_t]
   # Convert cargo into barrels
   events[, cargo_barrels_change := cargo_tonnes_change * 7.3]
-  
   # Classify event type
   events[, event_type := fifelse(draught_diff > 0, "loading", "level")]
   events[draught_diff < 0, event_type := "unloading"]
@@ -508,52 +363,18 @@ detect_draught_changes <- function(static) {
 # # Assign port names using spatial join #
 # ########################################
 
-# fix this such that there aren't multiple lookup tables as we had when working with thresholds/bands
-# for vessels to pass through. instead, we should find the lon/lat, find the nation, and map it to
-# the closest port within that nation, via a single lookup table.
+assign_nearest_port <- function(dt, lon_col, lat_col, result_col) {
+  dt_sf <- st_as_sf(copy(dt), coords = c(lon_col, lat_col), crs = 4326)
+  nearest_idx <- st_nearest_feature(dt_sf, ports_sf)
+  dt[[result_col]] <- ports_df$port_name[nearest_idx]
+  dt[is.na(get(result_col)), (result_col) := "Lost at Sea"]
+  return(dt)
+}
 
-assign_port_names <- function(dynamic, port_lookup) { 
-  
-  # # Create temporary interval column for foverlaps (allows interval instead of point)
-  # dynamic[, lat_end := lat]
-  # 
-  # setkey(port_lookup, lat_min, lat_max)
-  # 
-  # # Spatial join (latitude dimension)
-  # dynamic <- foverlaps(dynamic, port_lookup, 
-  #                      by.x = c("lat", "lat_end"), 
-  #                      by.y = c("lat_min", "lat_max"), 
-  #                      type = "any")
-  # 
-  # # Refine by longitude
-  # dynamic[!is.na(lon_min) & !is.na(lon_max) & !(lon >= lon_min & lon <= lon_max), 
-  #         port_name := NA]
-  # 
-  # # Fill unknown locations
-  # dynamic[is.na(port_name), port_name := "Lost at Sea"]
-  # 
-  # # Clean up helper columns
-  # cols_to_remove <- c("lat_min", "lat_max", "lon_min", "lon_max", "lat_end")
-  # dynamic[, (cols_to_remove) := NULL]
-  # 
-  # return(dynamic)
-  
-  # Ensure standard names for the join
-  setDT(dynamic)
-  setDT(port_lookup)
-  
-  # Perform a non-equi join: matches points inside the Lat/Lon boxes
-  # This is significantly faster and more memory-efficient than foverlaps
-  dynamic <- port_lookup[dynamic, 
-                         .(mmsi, time_utc, lat, lon, sog, cog, 
-                           port_name = x.port_name), 
-                         on = .(lat_min <= lat, lat_max >= lat, 
-                                lon_min <= lon, lon_max >= lon)]
-  
-  # Fill unknown locations
-  dynamic[is.na(port_name), port_name := "Lost at Sea"]
-  
-  return(dynamic)
+assign_port_names <- function(dt) {
+  dt <- assign_nearest_port(dt, "prev_lon", "prev_lat", "start_port")
+  dt <- assign_nearest_port(dt, "lon", "lat", "end_port")
+  return(dt)
 }
 
 # ######################################
@@ -835,20 +656,7 @@ get_unprocessed_filtered_files <- function() {
                               pattern = "^filtered_dynamic_.*\\.rds$", 
                               full.names = TRUE)
   
-  # Filter out already processed files
-  # static_files <- static_files[!static_files %in% processed_files_tracker]
-  # dynamic_files <- dynamic_files[!dynamic_files %in% processed_files_tracker]
-  
   list(static = static_files, dynamic = dynamic_files)
-}
-
-standardize_to_breadth <- function(dt) {
-  # Force all column names to lowercase first to avoid breadth_m/BREADTH_M issues
-  setnames(dt, tolower(names(dt)))
-  # Rename beam_m or width_m to breadth_m if they exist
-  if ("beam_m" %in% names(dt)) setnames(dt, "beam_m", "breadth_m")
-  if ("width_m" %in% names(dt)) setnames(dt, "width_m", "breadth_m")
-  return(dt)
 }
 
 # Track when next cycle runs
@@ -884,7 +692,6 @@ repeat {
     all_static <- rbindlist(lapply(files$static, function(f) {
       tryCatch({
         dt <- readRDS(f)
-        standardize_to_breadth(dt)  # Standardize each file individually
       }, error = function(e) {
         write(sprintf("%s [LOAD ERROR] %s: %s\n", Sys.time(), basename(f), e$message),
               file = "logs/error_log.log", append = TRUE)
@@ -896,7 +703,6 @@ repeat {
     all_dynamic <- rbindlist(lapply(files$dynamic, function(f) {
       tryCatch({
         dt <- readRDS(f)
-        standardize_to_breadth(dt)  # Standardize each file individually
       }, error = function(e) {
         write(sprintf("%s [LOAD ERROR] %s: %s\n", Sys.time(), basename(f), e$message),
               file = "logs/error_log.log", append = TRUE)

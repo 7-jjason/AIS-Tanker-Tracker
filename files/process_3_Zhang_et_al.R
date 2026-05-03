@@ -33,9 +33,6 @@ processed_dir <- "data/processed" # Print to
 if (!dir.exists(processed_dir)) dir.create(processed_dir, recursive = TRUE)
 if (!dir.exists("logs")) dir.create("logs")
 
-# Track processed files
-# processed_files_tracker <- character()
-
 # File counter
 processed_file_counter <- 1
 

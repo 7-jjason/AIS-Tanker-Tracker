@@ -13,7 +13,7 @@ process_scripts <- c(
   "files/process_1_websocket_receiver.R",
   "files/process_2_parser_filter.R", 
   "files/process_3_cpu_intensive.R",
-  "files/process_4_archive_to_postgreSQL.R"
+  "files/process_4_archive_to_MySQL.R"
 )
 
 # Monitoring settings
