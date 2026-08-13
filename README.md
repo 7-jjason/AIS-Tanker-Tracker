@@ -4,43 +4,46 @@ A real-time AIS data pipeline for detecting cargo-handling events and estimating
 
 #### Overview
 
-Ingests live global AIS data, isolates tanker vessels, cleans the stream, and detects when and where cargo is loaded or unloaded — along with an estimated mass transferred in metric tonnes and barrels.
+This program ingests live global AIS data, isolates tanker vessels, cleans data, detects cargo loading events, estimates the cargo mass loaded/unloaded in metric tonnes and barrels (x1000) by port and nation.
 
 #### Pipeline
 
 | Process | Role |
 |---|---|
 | **P1 – Ingestion** | Connects to AISStream.io via WebSocket; buffers raw hex messages to disk. |
-| **P2 – Parser** | Pre-filters at hex level (no full deserialisation), parses tanker messages, deduplicates, writes RDS files. |
-| **P3 – Analysis** | Cleaning → draught-change detection -> GMM berthing confirmation -> payload estimation (24h cycle). |
+| **P2 – Parser** | Filters at hex level; parses tanker messages; DBSCAN; writes RDS files. |
+| **P3 – Analysis** | Re-filter; draught-change detection; GMM berthing confirmation; payload estimation (24h cycle). |
 | **P4 – Storage** | Writes P3 output to MySQL (not included here). |
 | **Background Launcher** | Runs each process, deals with WiFi connectivity, emergency shutdowns, and hung processes. | 
 
-#### Methods
+#### Installation
 
-- **Cleaning:** Deterministic bounds filtering + per-vessel DBSCAN on draught (ε = 1 m, minPts = 2).
-- **Event detection:** Draught change > 1 m, elapsed time > 12 h, distance > 12 km (Zhang et al., 2025).
-- **Berthing confirmation:** Two-component GMM fitted to speed-over-ground; threshold = moored mean + 3σ.
-- **Cargo mass:** TPCI × draught change, corrected for ballast (MARPOL light ballast formula + 5% DWT heavy ballast).
+(1) Download:
+  - files/process_1_weksocket_receiver.R
+  - files/process_2_parser_filter.R
+  - files/process_3_Zhang_et_al.R
+  - files/background_launcher.R
+  - files/setup.R
+  - files/kill_process.R
+  - data/tanker_mmsi_registry.rds
+(2) Add API key from AISStream.io as a .R file in /files.
+(3) Execute setup.R and follow any instructions.
+(4) To begin the program, execute background_launcher.R.
+(5a) To stop the program, execute kill_process.R.
+(5b) If process does not stop using kill_process.R, use Activity Monitor on macOS or Task Manager on Windows.
 
 #### Key Dependencies
 
-- `dbscan`, `mclust`, `data.table`, `geosphere`.
-- AISStream.io API key.
 - Keep-Awake Utility such as Caffeinate, Amphetamine, or a similar tool to prevent your system from sleeping during operation.
 
 #### Output
 
-Each confirmed event record includes vessel identifiers, event type (loading/unloading), port, timing, vessel class, and mass estimates in tonnes and barrels. Events are appended to `data/output/all_cargo_events.rds`.
-
-**Vessel classes detected:** Small Tanker, Handysize, Handymax, Panamax, Aframax, Suezmax, VLCC, ULCC.
+- Each confirmed event record includes vessel identifiers, event type (loading/unloading), port, timing, vessel class, and mass estimates in tonnes and barrels. Events are appended to `data/output/all_cargo_events.rds`.
 
 #### Known Limitations
 
-- DWT regression carries uncertainty; planned upgrade to cluster-stratified or tree-based model.
+- DWT calculation does not account for changes in ballast that occur while loading/unloading. 
 - Single terrestrial AIS feed causes offshore coverage gaps.
-- Floating storage events not yet classified.
-- DBSCAN minimum points should increase. If static data for a specific MMSI is streamed every 6 minutes, then 2 points implies that a tanker only spend 12 minutes at a specific draught. This is impractical for movement, or for loading/unloading. Additionally, it would capture the changes in draught as it occurs instead of the entire change in draught, giving multiple events for each event. Given that unloading/loading events can be as short as 8 hours and trips are almost always longer than 8 hours (and for our interests always are), I would suggest to use minimum points = 7 hours * 10 points/hour = 70, which provides leeway on the short end. 
 
 #### References
 <!--
@@ -78,11 +81,11 @@ U.S. Energy Information Administration. (2014). Tanker sizes and classes. https:
 
 - AISStream.io. *Real-time AIS WebSocket API*. https://aisstream.io/.
 - Danish Maritime Authority. *AIS data download*. https://www.dma.dk/safety-at-sea/navigational-information/download-data.
+- Equasis. *Ship information search*. https://www.equasis.org/EquasisWeb/restricted/ShipInfo?fs=Search.
+- HI Nelson. (2019). *Seaports of the world*. https://www.hinelson.com/blog/wp-content/uploads/2019/09/Seaports-of-the-World.pdf.
 - NOAA Office for Coastal Management. (2025). *AIS data handler*. https://coast.noaa.gov/htdata/CMSP/AISDataHandler/2025/index.html.
 - NOAA Office for Coastal Management. (2018). *Vessel type codes*. https://coast.noaa.gov/data/marinecadastre/ais/VesselTypeCodes2018.pdf.
 - Warrant Group. *IMO vessel codes* [Data set]. GitHub. https://github.com/warrantgroup/IMO-Vessel-Codes/blob/master/data/imo-vessel-codes.csv.
-- HI Nelson. (2019). *Seaports of the world*. https://www.hinelson.com/blog/wp-content/uploads/2019/09/Seaports-of-the-World.pdf.
-- Equasis. *Ship information search*. https://www.equasis.org/EquasisWeb/restricted/ShipInfo?fs=Search.
 
 **Methodology**
 
@@ -105,5 +108,5 @@ U.S. Energy Information Administration. (2014). Tanker sizes and classes. https:
 
 #### Note
 
-- This project is a work in progress. All cargo estimates — including payload mass, draught changes, and barrel conversions — are approximations derived from AIS data and author-defined models; they are not guaranteed to be accurate and should not be treated as such.
-- Due to the concurrent, iterative nature of the four-process pipeline, processes can execute indefinitely (this is my intent). To be diligent before running this program, ensure you are familiar with your system's process management tools (Activity Monitor on macOS, Task Manager on Windows) so you can manually terminate processes if required.
+- All cargo estimates — including payload mass, draught changes, and barrel conversions — are approximations; they are not guaranteed to be accurate and should not be treated as such.
+- Due to the concurrent, iterative nature of the four-process pipeline, processes can intentionally execute indefinitely. To be diligent before running this program, ensure you are familiar with your system's process management tools (Activity Monitor on macOS, Task Manager on Windows) to manually terminate processes if required.

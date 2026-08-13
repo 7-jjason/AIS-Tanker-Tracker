@@ -12,6 +12,7 @@ files/db_password.R
 dwt_estimation.R
 logs/
 
+process_3_cpu_intensive.R
 process_4_archive_to_MySQL.R
 
 ais_api_key.R
@@ -25,6 +26,7 @@ Maritime Tanker Tracker Technical Summary.Rmd
 README.html
 
 docs1/
+docs/
 
 
 .Rhistory

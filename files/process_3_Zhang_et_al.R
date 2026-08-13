@@ -28,7 +28,7 @@ suppressPackageStartupMessages({
 # #############################################################################
 
 # Directories
-filtered_dir <- "data/archived"   # Get from
+filtered_dir <- "data/filtered"   # Get from
 processed_dir <- "data/processed" # Print to
 if (!dir.exists(processed_dir)) dir.create(processed_dir, recursive = TRUE)
 if (!dir.exists("logs")) dir.create("logs")
@@ -73,7 +73,6 @@ stats_count <- list(
   traj_points_filter_removed= 0
 )
 
-
 # #############################################################################
 # # (2) Lookup Table Setup ----------------------------------------------
 # #############################################################################
@@ -91,7 +90,10 @@ ports_df <- fread('data/World Port Index/UpdatedPub150.csv',
                "Longitude")
              ) |>
   mutate(
-    port_name = paste0(`Main Port Name`, ", ", `Country Code`)
+    port_name = paste0(`Main Port Name`, 
+                       ", ", 
+                       `Country Code`
+                       )
   ) |>
   select(
     port_name, 
@@ -100,7 +102,9 @@ ports_df <- fread('data/World Port Index/UpdatedPub150.csv',
   )
 
 # Port-lookup shapefile table
-ports_sf <- st_as_sf(ports_df, coords = c("lon", "lat"), crs = 4326)
+ports_sf <- st_as_sf(ports_df, 
+                     coords = c("lon", "lat"), 
+                     crs = 4326)
 
 # ##########################################################################
 # # MARAD Dimensions Lookup - # Papanikolaou "Ship Design Methodologies of #
@@ -304,8 +308,8 @@ clean_ais_data <- function(static, dynamic) {
     lon_check = round(lon, 1),
     date_seconds_check = round(date_seconds/10, 0)
   )]
-  # distinct instead?
-  static_clean <- unique(static_clean, by = c("mmsi", "lat_check", "lon_check", "draught", "date_seconds_check"))
+
+  static_clean <- distinct(static_clean, by = c("mmsi", "lat_check", "lon_check", "draught", "date_seconds_check"))
   static_clean[, `:=` (lat_check = NULL, lon_check = NULL, date_seconds_check = NULL)]
   stats_count$static_dedup_removed <<- stats_count$static_dedup_removed + (n_before_static_dedup - nrow(static_clean))
 

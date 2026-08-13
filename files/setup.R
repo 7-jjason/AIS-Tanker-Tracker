@@ -53,7 +53,8 @@ required_packages <- c(
   "lubridate",      # Process 3,5: Date/time handling
   "processx",       # Launcher: Process management
   "parallel",       # Process 2,3: Parallel processing
-  "later"           # Process 1: Event loop
+  "later",          # Process 1: Event loop
+  "sf"              # Process 3: Port Lookup
 )
 
 missing_packages <- character()
@@ -111,7 +112,6 @@ process_scripts <- c(
   "process_1_websocket_receiver.R",
   "process_2_parser_filter.R",
   "process_3_cpu_intensive.R",
-  "process_4_archive_to_MySQL.R"
   "background_launcher.R"
 )
 

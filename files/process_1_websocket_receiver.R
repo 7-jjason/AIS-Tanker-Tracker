@@ -20,31 +20,47 @@ data_dir <- "data/raw_hex"
 if (!dir.exists(data_dir)) dir.create(data_dir, recursive = TRUE)
 
 # Initialize file counter
-existing_files <- list.files(data_dir, pattern = paste0("raw_hex_", current_date, "_\\d+\\.txt"))
+existing_files <- list.files(data_dir, 
+                             pattern = paste0(
+                               "raw_hex_", 
+                               current_date, 
+                               "_\\d+\\.txt"
+                               )
+                             )
 file_counter <- length(existing_files) + 1
-current_file <- paste0(data_dir, "/raw_hex_", current_date, "_", 
-                       sprintf("%03d", file_counter), ".txt")
+current_file <- paste0(
+  data_dir, 
+  "/raw_hex_", 
+  current_date, 
+  "_", 
+  sprintf("%03d", file_counter), 
+  ".txt"
+  )
 
 # Initialize stats counters
 total_messages <- 0
 total_files_written <- 0
 
-# Initialize buffer s
+# Initialize buffers
 buffer_size <- 50000  # messages
 buffer_time <- 15     # seconds
 hex_buffer <- character(buffer_size)
 buffer_index <- 0
 last_flush <- Sys.time()
 
-# (2) Helper Function ------------------------------------------------------
+# (2) Flush Function ------------------------------------------------------
 
 # Flush buffer to disk
 flush_buffer <- function() {
   if (buffer_index == 0) return()
   
   # Append accumulated hex messages to file
-  con <- file(current_file, open = "w")
-  writeLines(hex_buffer[1:buffer_index], con)
+  con <- file(current_file, 
+              open = "w"
+              )
+  writeLines(hex_buffer[1:buffer_index], 
+             con
+             )
   close(con)
   
   # Update statistics
@@ -52,7 +68,10 @@ flush_buffer <- function() {
   total_messages <<- total_messages + buffer_index
   
   cat(sprintf("[FLUSH] Wrote %d messages to %s (Total: %d)\n", 
-              buffer_index, basename(current_file), total_messages))
+              buffer_index, 
+              basename(current_file), 
+              total_messages)
+      )
   
   
   
@@ -66,9 +85,13 @@ flush_buffer <- function() {
   
   # Iterate counter and file
   file_counter <<- file_counter + 1
-  current_file <<- paste0(data_dir, "/raw_hex_", 
-                          format(Sys.Date(), "%Y-%m-%d"), "_",
-                          sprintf("%03d", file_counter), ".txt")
+  current_file <<- paste0(data_dir, 
+                          "/raw_hex_", 
+                          format(Sys.Date(), "%Y-%m-%d"), 
+                          "_",
+                          sprintf("%03d", file_counter), 
+                          ".txt"
+                          )
 }
 
 # ##############################################################################
@@ -77,22 +100,28 @@ flush_buffer <- function() {
 
 create_ais_socket <- function() {
   
-  # Global subscription message (collect everything)
+  # Global subscription message 
   sub_msg <- list(
     APIKey = ais_api_key,
-    # Global bounding box - no need to restrict non-ports if fast enough
-    BoundingBoxes = list(list(list(-90, -180), list(90, 180))),
-    FilterMessageTypes = list("PositionReport", "ShipStaticData")
+    BoundingBoxes = list(list(list(-90, -180), 
+                              list(90, 180))
+                         ),
+    FilterMessageTypes = list("PositionReport", 
+                              "ShipStaticData")
   )
   
   # Create websocket
-  new_ws <<- WebSocket$new("wss://stream.aisstream.io/v0/stream", autoConnect = FALSE)
+  new_ws <<- WebSocket$new("wss://stream.aisstream.io/v0/stream", 
+                           autoConnect = FALSE
+                           )
   
-  # On connection open
+  # On connection open - send subscription message
   new_ws$onOpen(function(event) {
     # Must send request within 3s of opening connection
     cat("[SYSTEM] Socket opened.\n")
-    new_ws$send(toJSON(sub_msg, auto_unbox = TRUE))
+    new_ws$send(toJSON(sub_msg, 
+                       auto_unbox = TRUE)
+                )
   })
   
   # On message received - buffer in memory
@@ -101,36 +130,50 @@ create_ais_socket <- function() {
     raw_data <-event$data
     # Hex bytes to hex string
     if (is.raw(raw_data)) {
-      raw_data <- paste(format(raw_data), collapse = "")
+      raw_data <- paste(format(raw_data), 
+                        collapse = "")
     }
-    
     # Add to buffer
     buffer_index <<- buffer_index + 1
     hex_buffer[buffer_index] <<- raw_data
-    
     # Time since last flush
-    time_elapsed <- as.numeric(difftime(Sys.time(), last_flush, units = "secs"))
-    # If greater than X messages/lines of hex or greater than 1 second
+    time_elapsed <- as.numeric(difftime(Sys.time(), 
+                                        last_flush, 
+                                        units = "secs")
+                               )
+    # If greater than X messages/lines of hex or greater than max buffer time
     if (buffer_index >= buffer_size || time_elapsed >= buffer_time) {
       # Write lines to file, clean memory, start a new file
       flush_buffer()
-      # file_counter <<- file_counter + 1
-      # current_file <<- paste0(data_dir, "/raw_hex_", current_date, "_", 
-      #                         sprintf("%03d", file_counter), ".txt")
+      file_counter <<- file_counter + 1
+      current_file <<- paste0(data_dir, 
+                              "/raw_hex_", 
+                              current_date, 
+                              "_",
+                              sprintf("%03d", 
+                                      file_counter), 
+                              ".txt")
     }
   })
   
   # On close
   new_ws$onClose(function(event) {
-    cat(sprintf("[WARN] Socket closed. Code: %d\n", event$code))
+    cat(sprintf("[WARN] Socket closed. Code: %d\n", 
+                event$code)
+        )
   })
   
   # On error
   new_ws$onError(function(event) {
-    cat(sprintf("[ERROR] Socket error: %s\n", event$message))
+    cat(sprintf("[ERROR] Socket error: %s\n", 
+                event$message)
+        )
     # Log to error file
-    write(sprintf("%s [WEBSOCKET ERROR] %s\n", Sys.time(), event$message),
-          file = "logs/error_log.log", append = TRUE)
+    write(sprintf("%s [WEBSOCKET ERROR] %s\n", 
+                  Sys.time(), 
+                  event$message),
+          file = "logs/error_log.log", 
+          append = TRUE)
   })
   # Connect and return
   new_ws$connect()
@@ -190,22 +233,28 @@ tryCatch({
       # Check connection and adjust retry delay
       if (ws$readyState() == 1) {
         cat("[SUCCESS] Connection established. Streaming started...\n\n")
-        retry_delay <- 1 # Reset backoff on success
+        retry_delay <- 1 
       } else {
         cat(sprintf("[FAIL] Connection failed. Retrying in %.0fs....\n", 
             retry_delay))
         Sys.sleep(retry_delay)
-        retry_delay <- min(retry_delay * 2, max_delay) # Doubles each time
+        retry_delay <- min(retry_delay * 2, 
+                           max_delay)
         next 
       }
       
+      # Reconnect if >30 seconds since last data flush
       if (exists("last_message_time") && 
-          difftime(Sys.time(), last_message_time, units = "secs") > 30) {
+          difftime(Sys.time(), 
+                   last_message_time, 
+                   units = "secs") > 30) {
         cat("[TIMEOUT] No data in 30s, forcing reconnect...\n")
-        try(ws$close(), silent = TRUE)
+        try(ws$close(), 
+            silent = TRUE)
         ws <- NULL
         Sys.sleep(retry_delay)
-        retry_delay <- min(retry_delay * 2, max_delay)
+        retry_delay <- min(retry_delay * 2, 
+                           max_delay)
         next
       }
     }
@@ -227,10 +276,12 @@ tryCatch({
 })
 
 # ##############################################################################
-# # (5) Cleanup and Summary --------------------------------------------------
+# # (5) Summary --------------------------------------------------
 # ##############################################################################
 
 Sys.sleep(1)
+
 cat("\n------------------------------------------------------------------------------\n")
 cat(sprintf("PROCESS 1: Shutdown Complete %d messages, %d files\n", total_messages, total_files_written))
 cat("------------------------------------------------------------------------------\n")
+
