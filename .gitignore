@@ -11,6 +11,7 @@ data/output/
 files/db_password.R
 dwt_estimation.R
 logs/
+mmsi_tanker_registry_research.xlsx
 
 process_3_cpu_intensive.R
 process_4_archive_to_MySQL.R
