@@ -34,7 +34,19 @@ This program ingests live global AIS data, isolates tanker vessels, cleans data,
 
 #### Key Dependencies
 
-- Keep-Awake Utility such as Caffeinate, Amphetamine, or a similar tool to prevent your system from sleeping during operation.
+- AISStream.io API key.
+- Keep-awake utility such as Caffeinate, Amphetamine, or a similar tool to prevent your system from sleeping during operation.
+- R packages (installed during setup.R)
+  - websocket
+  - jsonlite
+  - data.table
+  - parallel
+  - dplyr
+  - dbscan
+  - mclust
+  - geosphere
+  - lubridate
+  - sf
 
 #### Output
 
